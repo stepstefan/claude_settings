@@ -5,11 +5,20 @@ edits made by Claude Code (or by you, anywhere) flow back to git automatically.
 
 ## New machine
 
+**Linux / macOS / WSL:**
 ```bash
 git clone <this-repo> ~/Workspace/claude_settings
 cd ~/Workspace/claude_settings
 ./bootstrap.sh
 ```
+
+**Windows (PowerShell):**
+```powershell
+git clone <this-repo> $HOME\Workspace\claude_settings
+cd $HOME\Workspace\claude_settings
+.\bootstrap.ps1
+```
+Symlinks on Windows need Developer Mode (Settings → For developers) or an elevated PowerShell. Without it, `bootstrap.ps1` falls back to file copies (no auto-sync). The bash status line only renders if Claude Code can invoke `bash` (Git Bash or WSL on PATH).
 
 Then open `claude` and run, for each line in `plugins.txt`:
 
@@ -41,7 +50,8 @@ git pull   # symlinks already in place, no re-bootstrap needed
 | `claude/statusline-command.sh` | agnoster-style status line |
 | `claude/commands/init-project.md` | `/init-project` user-level slash command |
 | `plugins.txt` | List of user-scope plugins to install per machine |
-| `bootstrap.sh` | Idempotent installer: symlinks + marketplace registration |
+| `bootstrap.sh` | Idempotent installer for Linux / macOS / WSL |
+| `bootstrap.ps1` | Idempotent installer for native Windows (PowerShell) |
 
 ## What's deliberately NOT tracked
 
