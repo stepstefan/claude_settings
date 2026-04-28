@@ -56,7 +56,7 @@ Get-Content (Join-Path $RepoDir 'plugins.txt') |
     Where-Object { $_ -and $_ -notmatch '^\s*#' } |
     ForEach-Object { Write-Host "  /plugin install $_" }
 Write-Host ""
-Write-Host "(Marketplace + installed plugins are managed by Claude Code itself —"
+Write-Host "(Marketplace + installed plugins are managed by Claude Code itself -"
 Write-Host " known_marketplaces.json and installed_plugins.json are NOT tracked here"
 Write-Host " because they contain machine-specific absolute paths.)"
 Write-Host ""
