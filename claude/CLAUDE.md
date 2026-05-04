@@ -55,12 +55,14 @@ Pass `model="sonnet"` (or omit) for:
 - `Explore` agent, `general-purpose` research, code-simplifier, comment-analyzer
 - `superpowers:code-reviewer` always — whether inside SDD or ad-hoc (Opus code review is exclusively `pr-review-toolkit:code-reviewer` at end-of-branch)
 
-`/review-pr all` routes correctly via frontmatter (`pr-review-toolkit:code-reviewer` is Opus-locked, others inherit Sonnet). Don't override unless a specific PR genuinely earns it (e.g., very subtle error-handling diff → escalate `silent-failure-hunter` to Opus).
+`/review-pr all` routes correctly via frontmatter (`pr-review-toolkit:code-reviewer` is Opus-locked, others inherit Sonnet). Don't override unless a specific PR genuinely earns it (e.g., very subtle error-handling diff → escalate `silent-failure-hunter` to Opus; architecturally significant new types → escalate `type-design-analyzer` to Opus).
 
 ### Thinking injection (always-on for specific phases)
 - **Brainstorming**: at the start of every brainstorming session, tell user to append `think hard` to their messages (thinking is user-triggered in main session).
 - **Plan-writing subagent**: always inject `think hard` into the subagent prompt.
 - **`silent-failure-hunter`**: always inject `think hard` into the subagent prompt.
+- **`pr-review-toolkit:code-reviewer`**: always inject `think hard` into the subagent prompt — runs end-of-branch on a non-trivial diff by definition; Opus + thinking is the right combo for convention/correctness review.
+- **Implementation / TDD subagents** for tasks flagged as subtle: inject `think hard`. The plan-writing subagent must mark each task `subtle: true | false` (true = concurrency, complex invariants, careful state, edge-case-heavy logic; false = mechanical CRUD/plumbing/refactor). Default is `false` — do NOT over-flag. When dispatching the plan-writer, instruct it to apply this flag per task.
 
 ### Thinking budget (user's call, I recommend)
 - Recommend `think hard` for: subtle correctness, tradeoff analysis, non-trivial diff review.
