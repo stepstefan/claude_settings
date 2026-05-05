@@ -1,5 +1,7 @@
 {
-  "model": "sonnet",
+  "env": {
+    "ANTHROPIC_MODEL": "sonnet"
+  },
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline-command.sh"
