@@ -1,7 +1,7 @@
 # User Preferences — Stefan
 
 ## 1. Development Workflow (Build-Verify Loop)
-Every feature/task must follow this loop:
+Follow this loop for any task involving new or changed logic. For purely mechanical changes (rename, typo, isolated single-file edit) skip Plan and Build — go straight to Verify.
 1. **Plan** — Read the task, scan the codebase, build plan for implementation AND verification
 2. **Build** — Implement with verification in mind. Write tests for happy paths and edge cases
 3. **Verify** — Run tests, read output, compare against what was ASKED (not against own code)
@@ -14,12 +14,12 @@ Execute the loop using these skills, in this order — no skipping:
 | Phase | Skill(s) |
 |-------|---------|
 | Plan | `superpowers:brainstorming` → `superpowers:writing-plans` |
-| Build | `superpowers:subagent-driven-development` |
-| Verify — per task | Each subagent: run tests (TDD) → **Spec Compliance Reviewer** (did it match the spec?) → **Code Quality Reviewer** (is it well-built?). Code Quality only runs after Spec passes. |
+| Build | `superpowers:subagent-driven-development` (ends with SDD's built-in final review pass over the whole implementation) |
+| Verify — per task | (SDD-internal) Each subagent: run tests (TDD) → **Spec Compliance Reviewer** (did it match the spec?) → **Code Quality Reviewer** (is it well-built?). Code Quality only runs after Spec passes. Both reviewers are SDD prompt-template subagents, not standalone skills. |
 | Tests — end of branch | Run full test suite. All tests must pass before proceeding. |
-| Review — end of branch | **MANDATORY:** `pr-review-toolkit:review-pr all` — run once, never per task, never skipped |
+| Review — end of branch | **MANDATORY:** `pr-review-toolkit:review-pr all` — run once after SDD finishes, never per task, never skipped. Complements SDD's built-in final reviewer (general quality) with 5 specialized aspects: tests, errors, types, comments, simplification. |
 | Polish | `pr-review-toolkit:code-simplifier` — only after review passes, never before |
-| Complete | `superpowers:finishing-a-development-branch` |
+| Complete | `superpowers:finishing-a-development-branch` — only after `review-pr all` passes |
 
 **Review gate rules (enforced before Complete):**
 - Critical / Important issues block `finishing-a-development-branch` — fix, then re-run only the agents that failed
@@ -29,48 +29,44 @@ Execute the loop using these skills, in this order — no skipping:
 - Never substitute `pr-review-toolkit:review-pr all` for the task code quality review as it is too expensive to be run per task
 
 ## 2. Model & Thinking Discipline
-Default: Sonnet 4.6 main session, thinking off, subagent model decided per-call.
+
+Default: Sonnet 4.6 main session, subagent model decided per-call.
 
 ### Main session escalation
-Before starting any of these, tell user "Recommend `/model opus` — reason: <one line>":
-- Interactive brainstorming for a non-trivial feature/refactor
-- Architecture or design discussion
-- Stuck debugging after 2+ failed hypotheses on Sonnet
+Recommend `/model opus` before: interactive brainstorming, architecture/design discussions,
+stuck debugging after 2+ failed hypotheses on Sonnet. Recommend `/model sonnet` after
+brainstorm/design ends. Never silently stay on the wrong model — say so and recommend re-routing.
 
-After the brainstorm/design phase ends, tell user "Recommend `/model sonnet`."
+### Subagent model (direct Agent dispatches)
 
-Never silently stay on Sonnet for a clearly hard interactive task. Never silently stay on Opus once the design phase is over. If mid-task my model estimate was wrong (Sonnet thrashing or Opus on trivia), say so explicitly and recommend re-routing.
+| Use `model="opus"` | Use `model="sonnet"` (or omit) |
+|--------------------|-------------------------------|
+| Plan-writing, architecture analysis, hard-bug investigation | Implementation, test writing, mechanical verification |
+| | Explore, general-purpose research, code-simplifier, comment-analyzer |
 
-### Two code-reviewer agents (important distinction)
-- `superpowers:code-reviewer` — `model: inherit` (Sonnet). Checks plan alignment and general quality. Used per-task inside `subagent-driven-development`.
-- `pr-review-toolkit:code-reviewer` — `model: opus` (hardcoded). Checks project conventions and CLAUDE.md compliance. Used end-of-branch via `/review-pr all`.
-These are complementary: different questions, different timing, different models. Never swap one for the other.
+Skills (`superpowers:*`, `pr-review-toolkit:*`) route their own models via frontmatter — do not override.
 
-### Subagent model (my call, no user prompt)
-Pass `model="opus"` when dispatching:
-- Plan-writing, architecture analysis, hard-bug investigation
+### Reviewers (never swap)
 
-Pass `model="sonnet"` (or omit) for:
-- Implementation from plan, test writing, mechanical verification
-- `Explore` agent, `general-purpose` research, code-simplifier, comment-analyzer
-- `superpowers:code-reviewer` always — whether inside SDD or ad-hoc (Opus code review is exclusively `pr-review-toolkit:code-reviewer` at end-of-branch)
+| Agent | Model | Checks | Timing |
+|-------|-------|--------|--------|
+| Spec Compliance Reviewer (SDD-internal) | Sonnet | Spec adherence | Per-task inside SDD |
+| Code Quality Reviewer (SDD-internal) | Sonnet | General code quality | Per-task inside SDD, after spec passes |
+| `pr-review-toolkit:code-reviewer` | Opus (hardcoded) | Project conventions, CLAUDE.md compliance | End-of-branch via `/review-pr all` |
 
-`/review-pr all` routes correctly via frontmatter (`pr-review-toolkit:code-reviewer` is Opus-locked, others inherit Sonnet). Don't override unless a specific PR genuinely earns it (e.g., very subtle error-handling diff → escalate `silent-failure-hunter` to Opus; architecturally significant new types → escalate `type-design-analyzer` to Opus).
+**Note:** SDD recommends the most capable model for review-stage subagents. We override to Sonnet for per-task reviewers — at task scope (typically 1-2 files) Sonnet catches what we need, and the per-task volume makes Opus too expensive. Opus is reserved for end-of-branch review via `/review-pr all`.
 
-### Thinking injection (always-on for specific phases)
-- **Brainstorming**: at the start of every brainstorming session, tell user to append `think hard` to their messages (thinking is user-triggered in main session).
-- **Plan-writing subagent**: always inject `think hard` into the subagent prompt.
-- **`silent-failure-hunter`**: always inject `think hard` into the subagent prompt.
-- **`pr-review-toolkit:code-reviewer`**: always inject `think hard` into the subagent prompt — runs end-of-branch on a non-trivial diff by definition; Opus + thinking is the right combo for convention/correctness review.
-- **Implementation / TDD subagents** for tasks flagged as subtle: inject `think hard`. The plan-writing subagent must mark each task `subtle: true | false` (true = concurrency, complex invariants, careful state, edge-case-heavy logic; false = mechanical CRUD/plumbing/refactor). Default is `false` — do NOT over-flag. When dispatching the plan-writer, instruct it to apply this flag per task.
+`/review-pr all` routes models via frontmatter. Override only for genuinely subtle diffs
+(escalate `silent-failure-hunter` or `type-design-analyzer` to Opus ad-hoc).
 
-### Thinking budget (user's call, I recommend)
-- Recommend `think hard` for: subtle correctness, tradeoff analysis, non-trivial diff review.
-- Recommend `ultrathink` for: deep multi-hypothesis debugging, hard architecture decisions.
-- Don't recommend thinking for mechanical tasks. State the reason in one line.
+### `ultrathink` and effort
 
-### Built-in plan mode vs `writing-plans` skill
-Built-in plan mode (Shift+Tab) and `superpowers:writing-plans` are orthogonal mechanisms. In the superpowers workflow, use `brainstorming → writing-plans → subagent-driven-development` and ignore Shift+Tab. Built-in plan mode is for ad-hoc "what would you do here?" outside that workflow.
+- Use sparingly — at `xhigh`/`max`, adaptive thinking already covers most hard turns. Reserve for turns clearly higher-stakes than the surrounding session.
+- For sustained deep sessions: recommend `/effort xhigh` or `max` — the durable lever.
+
+### Plan mode
+`superpowers:writing-plans` is the workflow tool (brainstorming → writing-plans → SDD).
+Built-in plan mode (Shift+Tab) is for ad-hoc "what would you do here?" only.
 
 ## 3. Environment Awareness
 - Always check if a conda/venv environment needs to be activated for the current project (python)
@@ -93,15 +89,16 @@ Built-in plan mode (Shift+Tab) and `superpowers:writing-plans` are orthogonal me
 - Do NOT commit plans or design docs to the repo unless explicitly asked — if a plan seems worth saving, ask where it should go (repo, Notion, etc.)
 
 ## 7. Testing Mindset
-- When implementing a feature, always think: how can and should this be tested?
-- Write tests for both happy paths and edge cases
 - Tests must pass before considering work done
+- Design tests around real failures — only write a test if its absence would let a bug through
+- Cover critical paths and failure modes first; redundant variations of the same case add noise, not confidence
 
-## 8. Communication & Task Management
+## 8. CLAUDE.md Maintenance
+- End of branch: before `finishing-a-development-branch`, run `claude-md-management:revise-claude-md` —
+  decide what belongs in user vs project file, propose changes, get feedback, then apply
+
+## 9. Communication & Task Management
 - Don't create task lists for simple sequential work
 - Follow the user's plan step-by-step; don't improvise extra steps
 - Be concise — don't over-explain
 - Keep project documentation (CLAUDE.md etc.) synchronized with actual project state
-
-## 9. Docstring Convention
-- Triple quotes with newline for class/method docstrings (python)
